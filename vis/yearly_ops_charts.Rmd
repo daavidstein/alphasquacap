@@ -1,0 +1,41 @@
+---
+title: "Untitled"
+author: "James Trimarco"
+date: "5/2/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+### s
+```{r fig.height=20, fig.width=2}
+# Data downloaded from
+# https://aspm.faa.gov/opsnet/sys/Airport.asp
+t <- read_excel("/Users/james/Documents/NCDS/Semester_2/Distributed_computing/data_by_airport/yearly_ops_all_airports.xlsx", skip = 7)
+
+t <- t %>% 
+  select(1:2, 8) %>%
+  mutate(airport = X__1, 
+         year = Year, 
+         ops = Operations, 
+         len = str_length(airport)) %>%
+  filter(year > 1990 & year < 2019) %>%
+  filter(len < 4) %>%
+  select(airport, year, ops) 
+  
+  
+
+ggplot(t, aes(x = year, y = ops)) +
+  scale_y_continuous(limits = c(0, 1000000), labels = scales::comma) +
+  geom_line() +
+  facet_grid(rows = vars(airport), scales = "free")
+```
+
