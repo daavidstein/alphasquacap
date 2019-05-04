@@ -1,7 +1,3 @@
-# ISSUES
-# The csv that's output at the end of this is horribly malformed. 
-# Can you fix it?
-
 from __future__ import print_function
 import operator
 import platform
@@ -14,8 +10,21 @@ findspark.init()
 # Get pyspark
 import pyspark
 
+# tmp_spark
+
+conf = pyspark.SparkConf()
+conf.set('spark.local.dir', '/Akamai_scratch/tmp_spark/')
+conf.set('spark.executor.memory', '15g')
+conf.set('spark.driver.memory', '15g')
+#conf.setMaster('local')
+
 # Tell Spark to use all the local clusters
-sc = pyspark.SparkContext("local[*]", appName="myAppName")
+sc = pyspark.SparkContext('local[*]', 'airports', conf)
+# Tell spark to create a session
+from pyspark.sql import SparkSession
+#sess = SparkSession(sc).builder.config(sc.getConf).config("spark.local.dir", "/Akamai_scratch/").getOrCreate()
+sess = SparkSession(sc)
+
 # Hold back on the error messages
 sc.setLogLevel("ERROR")
 
@@ -49,10 +58,10 @@ def is_selected(x):
 
 # Remove reviews that share date, tail num, origin, dest, and departure time
 # Note that the entire row is the value here
-all_dupes = airport.map(lambda x: ((x[3], x[6], x[11], x[15], x[16]), x))
+#all_dupes = airport.map(lambda x: ((x[3], x[6], x[11], x[15], x[16]), x))
 # Group by row values, dropping duplicates
-airport = all_dupes.reduceByKey(lambda x, y: x) \
-                   .map(lambda x: x[1])
+#airport = all_dupes.reduceByKey(lambda x, y: x) \
+#                   .map(lambda x: x[1])
 
 # x11 is ORIGIN
 # x15 is DEST
@@ -60,20 +69,32 @@ airport = all_dupes.reduceByKey(lambda x, y: x) \
 # map: emit: (year, (airport of interest?, airport of interest?))
 # reduceByKey: count arrivals and departures by year
 # map: flatten the keys and values
-rdd = airport.filter(lambda x: x[11] == ap_select or x[15] == ap_select) \
-             .map(lambda x: (x[0], (is_selected(x[11]), is_selected(x[15])))) \
-             .reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1])) \
-             .map(lambda x: x[:-1] + x[-1])
+
+#rdd = airport.filter(lambda x: x[8] == ap_select or x[12] == ap_select) \
+#             .map(lambda x: (x[0], (is_selected(x[8]), is_selected(x[12])))) \
+#             .reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1])) \
+#             .map(lambda x: x[:-1] + x[-1])
+
+rdd = airport.map(lambda x:(x[0], 1)) \
+             .reduceByKey(lambda x, y: x+y)
 
 print("Python version: " + platform.python_version())
-print("RDD count: " + str(rdd.count()))
+#print("RDD count: " + str(rdd.count()))
 
-print(rdd.take(20))
+print(rdd.take(15))
 
 # collect and save as csv
-with open('/Akamai_scratch/airport_alpha/test_csv.csv', 'wb') as myfile:
-    wr = csv.writer(myfile, delimiter = ',', quoting=csv.QUOTE_ALL)
-    wr.writerow(rdd.collect())
+#with open('/Akamai_scratch/airport_alpha/test_csv_stl.csv', 'wb') as myfile:
+#    wr = csv.writer(myfile, delimiter = ',', quoting=csv.QUOTE_ALL)
+#    wr.writerow(rdd.collect())
+
+#from pyspark import SparkContext, SparkConf
+#from pyspark.sql import SparkSession
+#conf = SparkConf()
+#sc = SparkContext(conf=conf)
+#spark = SparkSession.builder.config(conf=conf).getOrCreate() 
 
 
-
+#df = sess.createDataFrame(rdd, ['year', 'arrivals', 'departures'])
+df = sess.createDataFrame(rdd, ['year', 'count'])
+df.coalesce(1).write.save(path='./test_csv_stl.csv', format='csv', mode='append')
