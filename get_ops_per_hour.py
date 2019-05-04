@@ -10,13 +10,10 @@ findspark.init()
 # Get pyspark
 import pyspark
 
-# tmp_spark
-
 conf = pyspark.SparkConf()
 conf.set('spark.local.dir', '/Akamai_scratch/tmp_spark/')
 conf.set('spark.executor.memory', '15g')
 conf.set('spark.driver.memory', '15g')
-#conf.setMaster('local')
 
 # Tell Spark to use all the local clusters
 sc = pyspark.SparkContext('local[*]', 'airports', conf)
@@ -56,27 +53,40 @@ airport = raw_data.filter(lambda x: x != header)
 def is_selected(x):
     return x == ap_select
 
-# Remove reviews that share date, tail num, origin, dest, and departure time
-# Note that the entire row is the value here
-#all_dupes = airport.map(lambda x: ((x[3], x[6], x[11], x[15], x[16]), x))
-# Group by row values, dropping duplicates
-#airport = all_dupes.reduceByKey(lambda x, y: x) \
-#                   .map(lambda x: x[1])
+def extract_hour(x):
+  """This extracts an hour between 1 and 24 from numbers formatted like '425' or '1345'."""
+  x = str(x).strip()
+  if len(x) == 3:
+    return int(x[0])
+  elif len(x) == 4 and x[:2] != '24':
+    return int(x[:2])
+  elif len(x) < 3 or (len(x) == 4 and x[:2] == '24'):
+    return(0)
+ 
+# x[0] is year
+# x[1] is month
+# x[2] is day of the month
+# x[8] is origin
+# x[13] is departure time
+ 
+#get count of arrivals for every unique pair (day_of_month, hour) in the month
+arrs_per_hour = airport.filter(lambda x: x[8] == ap_select) \
+	                   .map(lambda x: ((x[0], x[1], x[2], (extract_hour(x[13]))), 1)) \
+                       .reduceByKey(lambda x, y: x+y) 
 
-# x11 is ORIGIN
-# x15 is DEST
-# filter: select airport of interest
-# map: emit: (year, (airport of interest?, airport of interest?))
-# reduceByKey: count arrivals and departures by year
-# map: flatten the keys and values
+# x[12] is destination
+# x[16] is arrival time
 
-#rdd = airport.filter(lambda x: x[8] == ap_select or x[12] == ap_select) \
-#             .map(lambda x: (x[0], (is_selected(x[8]), is_selected(x[12])))) \
-#             .reduceByKey(lambda x, y: (x[0] + y[0], x[1] + y[1])) \
-#             .map(lambda x: x[:-1] + x[-1])
+# #get count of departures for every unique pair (day_of_month, hour) in the month
+deps_per_hour = airport.filter(lambda x: x[12] == ap_select)  \
+               .map(lambda x: ((x[0], x[1], x[2], (extract_hour(x[16]))), 1)) \
+               .reduceByKey(lambda x, y: x+y) 
 
-rdd = airport.map(lambda x:(x[0], 1)) \
-             .reduceByKey(lambda x, y: x+y)
+hours = arrs_per_hour.join(deps_per_hour) \
+                   .map(lambda x: (x[0][1], x[1][0], x[1][1], month, year))
+
+#rdd = airport.map(lambda x:(x[0], 1)) \
+#             .reduceByKey(lambda x, y: x+y)
 
 print("Python version: " + platform.python_version())
 #print("RDD count: " + str(rdd.count()))
