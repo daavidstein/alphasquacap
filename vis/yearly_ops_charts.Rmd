@@ -8,69 +8,18 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### import libs
 ```{r}
 library(here)
 library(tidyverse)
 library(readxl)
 library(lubridate)
-
 ```
 
-### s
-```{r fig.height=20, fig.width=2.5}
-# Data downloaded from
-#t_path <- here::here("data", "yearly_ops_all_airports.xlsx") 
-t <- read.csv(here::here("data", "merged_ops_delay.csv"))
-
-ggplot(t, aes(x = year)) +
-  scale_y_continuous(limits = c(0, 1000000), labels = scales::comma) +
-  scale_x_discrete(limits = c(2004, 2018)) +
-  geom_line(aes(y = ops)) +
-  geom_point(aes(x = year, y = ops, color = Prop_On_Time)) +
-  facet_grid(rows = vars(airport), scales = "free")
-
-ggplot(t, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  facet_grid(rows = vars(airport), scales = "free_y")
-```
-
-### Las Vegas plot
+### import and name data
 ```{r}
-ap <- "LAS"
-
-apt <- t %>% filter(airport == ap) %>%
-  mutate(exp_date = as_date(2012))
-
-ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  geom_vline(xintercept = 2012) +
-  labs(title = "Before- and After-Expansion Capacity at LAS", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
-       x = "Year", 
-       y = "Arrivals")
-```
-
-
-### Baltimore plot
-```{r}
-ap <- "BWI"
-
-apt <- t %>% filter(airport == ap) %>%
-  mutate(exp_date = as_date(2005))
-
-ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  geom_vline(xintercept = 2005) +
-  labs(title = "Before- and After-Expansion Capacity at BWI", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
-       x = "Year", 
-       y = "Arrivals")
+path <- here::here("data", "yearly", "merged_ops_delay.csv")
+t <- read.csv(path)
 ```
 
 ### LAX plot
