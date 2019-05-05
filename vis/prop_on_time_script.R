@@ -23,8 +23,6 @@ standard$Date <- as.Date(sub("\\-", "-1-", standard$Date), "%y-%d-%b")
 # Converts datetype to year string
 standard$Date <- format(standard$Date, "%Y")
 
-
-
 # ^^^ CSV CLEANED. Ignore above code if you use the cleaned csv!
 # Sum up arrivals and arrivals on time per year for each airport
 standard <- standard %>%
@@ -41,11 +39,9 @@ standard <- standard %>%
   mutate(Prop_On_Time = On_Time_Arrivals/Actual_Arrivals) %>%
   filter(Date != "2003")
 
-
-
 # Joining with James' File
 # Data downloaded from
-t_path <- here::here("data", "yearly_ops_all_airports.xlsx")
+t_path <- here::here("data", "yearly", "yearly_ops_all_airports.xlsx")
 t <- read_excel(t_path, skip = 7)
 
 t <- t %>% 

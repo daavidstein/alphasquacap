@@ -1,6 +1,5 @@
 ---
 title: "Yearly Ops Chart"
-author: "James Trimarco"
 date: "5/2/2019"
 output: html_document
 ---
@@ -9,33 +8,92 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+### import libs
 ```{r}
 library(here)
 library(tidyverse)
 library(readxl)
 library(lubridate)
-
 ```
 
-### s
-```{r fig.height=20, fig.width=2}
-# Data downloaded from
-t_path <- here::here("data", "yearly_ops_all_airports.xlsx") 
-t <- read_excel(t_path, skip = 7)
-
-t <- t %>% 
-  select(1:2, 8) %>%
-  mutate(airport = X__1, 
-         year = Year, 
-         ops = Operations, 
-         len = str_length(airport)) %>%
-  filter(year > 1990 & year < 2019) %>%
-  filter(len < 4) %>%
-  select(airport, year, ops) 
-
-ggplot(t, aes(x = year, y = ops)) +
-  scale_y_continuous(limits = c(0, 1000000), labels = scales::comma) +
-  geom_line() +
-  facet_grid(rows = vars(airport), scales = "free")
+### import and name data
+```{r}
+path <- here::here("data", "yearly", "merged_ops_delay.csv")
+t <- read.csv(path)
 ```
 
+### LAX plot
+```{r}
+ap <- "LAX"
+
+apt <- t %>% filter(airport == ap) %>%
+  mutate(exp_date = as_date(2005))
+
+ggplot(apt, aes(x = year)) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(limits = c(2004, 2018)) +
+  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
+  geom_vline(xintercept = 2010) +
+  labs(title = "Before- and After-Expansion Capacity at LAX", 
+       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       x = "Year", 
+       y = "Arrivals")
+```
+
+### ATL plot
+```{r}
+ap <- "ATL"
+
+apt <- t %>% filter(airport == ap) %>%
+  mutate(exp_date = as_date(2005))
+
+ggplot(apt, aes(x = year)) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(limits = c(2004, 2018)) +
+  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
+  #geom_line(aes(y = ops)) +
+  geom_vline(xintercept = c(2006, 2012)) +
+  labs(title = "Before- and After-Expansion Capacity at ATL", 
+       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       x = "Year", 
+       y = "Arrivals")
+```
+
+### LGA plot
+```{r}
+ap <- "LGA"
+
+apt <- t %>% filter(airport == ap) %>%
+  mutate(exp_date = as_date(2005))
+
+ggplot(apt, aes(x = year)) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(limits = c(2004, 2018)) +
+  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
+  #geom_line(aes(y = ops)) +
+  geom_vline(xintercept = c(2010)) +
+  labs(title = "Before- and After-Expansion Capacity at LGA", 
+       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       x = "Year", 
+       y = "Arrivals")
+```
+
+
+### ORD plot
+```{r}
+ap <- "ORD"
+
+apt <- t %>% filter(airport == ap) %>%
+  mutate(exp_date = as_date(2005))
+
+ggplot(apt, aes(x = year)) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_continuous(limits = c(2004, 2018)) +
+  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
+  #geom_line(aes(y = ops)) +
+  geom_vline(xintercept = c(2008, 2013, 2015), color = "red") +
+  labs(title = "Before- and After-Expansion Capacity at ORD", 
+       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       x = "Year", 
+       y = "Arrivals")
+```
