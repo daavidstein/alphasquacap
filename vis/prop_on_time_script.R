@@ -12,13 +12,10 @@ standard <- read_csv(standard_path)
 
 # Removes stupid government tallies
 standard <- standard %>%
-  filter(!str_detect(Facility, 'Sub-Total'))
-
-# This detects dates with only one number for year and adds 0 in front:
-standard$Date[!grepl("[0-9]{2}", standard$Date)] <- paste0("0", standard$Date[!grepl("[0-9]{2}", standard$Date)], sep="")
+  filter(!str_detect(Date, 'Sub-Total'))
 
 # Converts Month-Year (JUN-13) to Date Format (2013-06-01)
-standard$Date <- as.Date(sub("\\-", "-1-", standard$Date), "%y-%d-%b")
+standard$Date <- as.Date(sub("\\-", "01", standard$Date), "%b%d%y")
 
 # Converts datetype to year string
 standard$Date <- format(standard$Date, "%Y")
