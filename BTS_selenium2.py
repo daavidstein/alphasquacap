@@ -1,7 +1,44 @@
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
+import time
+import os
 
-driver = webdriver.Chrome("/Users/james/Downloads/chromedriver")
+def download_wait(directory, timeout, nfiles=None):
+    """
+    Wait for downloads to finish with a specified timeout.
+
+    Args
+    ----
+    directory : str
+        The path to the folder where the files will be downloaded.
+    timeout : int
+        How many seconds to wait until timing out.
+    nfiles : int, defaults to None
+        If provided, also wait for the expected number of files.
+
+    """
+    driver.find_element_by_xpath("//button[contains(@onclick, 'tryDownload()')]").click() #click the download button
+    
+    loops = 0
+    dl_wait = True
+    while dl_wait:
+        if loops > timeout:
+            break
+        time.sleep(1)
+        dl_wait = False
+        files = os.listdir(directory)
+        if nfiles and len(files) != nfiles:
+            dl_wait = True
+
+        for fname in files:
+            if fname.endswith('.crdownload'): #before you run this code, make sure you delete any .crdownload files in your downloads folder.
+                dl_wait = True
+
+        loops += 1
+    return loops
+
+driver = webdriver.Chrome()
+my_download_dir = "C:\\Users\\stein\\Downloads" #replace with your downloads directory
 
 #pull up the website
 driver.get("https://www.transtats.bts.gov/Tables.asp?DB_ID=120&DB_Name=Airline%20On-Time%20Performance%20Data&DB_Short_Name=On-Time#")
@@ -29,12 +66,15 @@ driver.find_element_by_xpath("//input[contains(@title, 'WeatherDelay')]").click(
 driver.find_element_by_xpath("//input[contains(@title, 'NASDelay')]").click()
 driver.find_element_by_xpath("//input[contains(@title, 'LateAircraftDelay')]").click()
 
-for year in range(2004, 2019):
+for year in range(2000, 2018):
     for month in range(1,13):
 
         my_select = Select(driver.find_element_by_id('XYEAR')) #find the year dropdown bar
         my_select.select_by_value(str(year)) #select year
         my_select = Select(driver.find_element_by_id('FREQUENCY')) #find the months dropdown bar
         my_select.select_by_value(str(month))
-        driver.find_element_by_xpath("//button[contains(@onclick, 'tryDownload()')]").click() #click the download buton
+       
+        download_wait(my_download_dir, 600, nfiles=None)
+        #for an extra pause after the download (should have) completed, uncomment the line below
+        #time.sleep(20)
         
