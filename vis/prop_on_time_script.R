@@ -43,7 +43,9 @@ t <- read_excel(t_path, skip = 7)
 
 t <- t %>% 
   select(1:2, 8) %>%
-  mutate(airport = ...1, 
+  mutate(
+    #airport = ...1, 
+    airport = X__1, 
          year = Year, 
          ops = Operations, 
          len = str_length(airport)) %>%
@@ -59,3 +61,5 @@ standard$year <- as.numeric(standard$year)
 
 # Merging on airport and year
 merged_df <- full_join(t, standard, by = c("airport", "year"))
+
+#write.csv(merged_df, here::here("data", "yearly", "merged_ops_delay.csv"))

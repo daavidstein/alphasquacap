@@ -8,7 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
+## prep
 ### import libs
 ```{r}
 library(here)
@@ -18,7 +18,8 @@ library(viridis)
 library(lubridate)
 ```
 
-### import and munge data
+## ATL
+### import ATL and munge data
 ```{r}
 path <- here::here("data", "hourly", "atl.csv")
 atl <- read.csv(path)
@@ -34,15 +35,36 @@ head(atl)
 ```
 
 ### ATL: prop_delay mapped to color
-```{r fig.height=5, fig.width=5}
+```{r fig.height=4, fig.width=6}
 plot_atl <- atl %>%
-  filter(hour > 6, hour < 12) 
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
 
 ggplot(plot_atl, aes(x = deps, y = arrs)) +
+  theme_minimal() +
   scale_x_continuous() +
- scale_color_viridis(option = "plasma") +
-  geom_point(aes(color = prop_del), alpha = 1, size = .33) +
-  facet_wrap(~year, nrow = 5, ncol = 3)
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year, nrow = 3, ncol = 5)  +
+  labs(title = "Hourly Operations Over Time at ATL", 
+       color = "Hourly on-time-ness")
+```
+
+### ATL proportion chart
+```{r}
+plot_atl_2 <- plot_atl %>%
+  group_by(year, delay_cat) %>%
+  summarize(n = n() ) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(plot_atl_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1)) +
+  geom_line() +
+  labs(title = "Proportion of Timely Hours at ATL", 
+       color = "On-timeness of hours")
+
 ```
 
 ### ATL: on_timearrivals only
@@ -61,4 +83,214 @@ ggplot(plot_atl, aes(x = deps, y = arrs)) +
   geom_point(alpha = .33, size = .33) +
   facet_wrap(~year, nrow = 5, ncol = 3) +
   labs(title = "ATL: all arrivals and departures")
+```
+
+## ORD
+### import ORD and munge data
+```{r}
+path <- here::here("data", "hourly", "ord.csv")
+ord <- read.csv(path)
+names(ord) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+ord <- ord %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(ord)
+```
+
+### ORD: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+library(cowplot)
+library(ggExtra)
+
+
+
+plot_ord <- ord %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_ord, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year, nrow = 3, ncol = 5) +
+  labs(title = "Hourly Operations Over Time at ORD", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
+```
+```{r}
+plot_ord_2 <- plot_ord %>%
+  group_by(year, delay_cat) %>%
+  summarize(n = n() ) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(plot_ord_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1)) +
+  geom_line() +
+  labs(title = "Proportion of Timely Hours at ORD", 
+       color = "On-timeness of hours")
+```
+
+
+### Just delays
+```{r}
+library(ggridges)
+head(ord)
+
+ggplot(ord, aes(x = prop_del, y = as.factor(year))) + 
+  geom_density_ridges() +
+    labs(title = "Performance by Hour at ORD", 
+         x = "Distribution of the Proportion of flights delayed", 
+         y = "year")
+
+ggplot(plot_ord, aes(x = year, y = total_delays)) +
+    geom_bar(stat = "identity")
+
+ggplot(plot_ord, aes(x = deps_del, y = arrs_del)) +
+  scale_x_continuous() +
+ scale_color_viridis(option = "plasma") +
+  geom_point(aes(color = prop_del), alpha = 1, size = .33) +
+  facet_wrap(~year, nrow = 5, ncol = 3) +
+  labs(title = "Arrivals and Departures at ORD")
+```
+
+```{r}
+library(glue)
+
+head(atl)
+
+
+atl_ <- atl %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(date = mdy(glue("{month}-", "{day}-", "{year}")),
+         num_date = as.numeric((date)),
+         delayed_arrivals = deps - deps_on_time) 
+
+atl_agg <- atl %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(date = mdy(glue("{month}-", "{day}-", "{year}")),
+         num_date = as.numeric((date)),
+         delayed_arrivals = deps - deps_on_time) %>%
+  group_by(month) %>%
+  summarize(mean_delayed_arrs = mean(delayed_arrivals))
+
+ggplot(atl_agg, aes(x = month, y = mean_delayed_arrs)) +
+  geom_line()
+
+cutoff <- as.numeric(mdy("5-1-2006"))
+
+v <- RDestimate(delayed_arrivals~num_date, 
+                cutpoint = cutoff, 
+                kernel = "gaussian",
+                bw = 200,
+                data = atl_)
+
+plot(v)
+summary(v)
+plot(atl_$num_date, atl_$arrs_on_time)
+
+
+```
+
+
+```{r}
+head(atl)
+
+atl_max <- atl %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(date = mdy(glue("{month}-", "{day}-", "{year}")),
+         ops_on_time = arrs_on_time + deps_on_time) %>%
+  group_by(date, year, month) %>%
+  mutate(max_ops_per_day = max(ops_on_time)) %>%
+  group_by(year) %>%
+  mutate(mean_max = mean(max_ops_per_day))
+  
+  
+ggplot(atl_max, aes(x = year, y = mean_max)) +
+  geom_
+
+
+```
+
+## LGA
+### import LGA and munge data
+```{r}
+path <- here::here("data", "hourly", "lga.csv")
+lga <- read.csv(path)
+names(lga) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+lga <- lga %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(lga)
+```
+
+### LGA: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+library(cowplot)
+library(ggExtra)
+
+
+
+plot_lga <- lga %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_lga, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4, position = "jitter") +
+  facet_wrap(~year, nrow = 3, ncol = 5) +
+  labs(title = "Hourly Operations Over Time at LGA", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
+
+
+```
+
+
+## STL
+### import STL and munge data
+```{r}
+path <- here::here("data", "hourly", "ord.csv")
+stl <- read.csv(path)
+names(stl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+stl <- stl %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(stl)
+```
+
+### STL: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+
+plot_stl <- stl %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_stl, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year, nrow = 3, ncol = 5) +
+  labs(title = "Hourly Operations Over Time at STL", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
 ```

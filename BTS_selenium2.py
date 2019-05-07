@@ -37,9 +37,10 @@ def download_wait(directory, timeout, nfiles=None):
         loops += 1
     return loops
 
-driver = webdriver.Chrome()
-my_download_dir = "C:\\Users\\stein\\Downloads" #replace with your downloads directory
-
+#driver = webdriver.Chrome()
+driver = webdriver.Chrome("/Users/james/Downloads/chromedriver")
+#my_download_dir = "C:\\Users\\stein\\Downloads" #replace with your downloads directory
+my_download_dir = "/Users/james/Downloads/bts"
 #pull up the website
 driver.get("https://www.transtats.bts.gov/Tables.asp?DB_ID=120&DB_Name=Airline%20On-Time%20Performance%20Data&DB_Short_Name=On-Time#")
 
@@ -66,7 +67,7 @@ driver.find_element_by_xpath("//input[contains(@title, 'WeatherDelay')]").click(
 driver.find_element_by_xpath("//input[contains(@title, 'NASDelay')]").click()
 driver.find_element_by_xpath("//input[contains(@title, 'LateAircraftDelay')]").click()
 
-for year in range(2000, 2018):
+for year in range(2000, 2019):
     for month in range(1,13):
 
         my_select = Select(driver.find_element_by_id('XYEAR')) #find the year dropdown bar
@@ -74,7 +75,7 @@ for year in range(2000, 2018):
         my_select = Select(driver.find_element_by_id('FREQUENCY')) #find the months dropdown bar
         my_select.select_by_value(str(month))
        
-        download_wait(my_download_dir, 600, nfiles=None)
+        download_wait(my_download_dir, 5000, nfiles=None)
         #for an extra pause after the download (should have) completed, uncomment the line below
-        #time.sleep(20)
+        time.sleep(5)
         

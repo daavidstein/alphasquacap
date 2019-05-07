@@ -14,52 +14,103 @@ library(here)
 library(tidyverse)
 library(readxl)
 library(lubridate)
+library(wesanderson)
 ```
 
 ### import and name data
 ```{r}
 path <- here::here("data", "yearly", "merged_ops_delay.csv")
 t <- read.csv(path)
+
+t <- t %>%
+  mutate(Delayed_Arrivals = Actual_Arrivals - On_Time_Arrivals)
+
+head(t)
 ```
 
-### LAX plot
+### more
 ```{r}
-ap <- "LAX"
+ap <- "ATL"
 
-apt <- t %>% filter(airport == ap) %>%
-  mutate(exp_date = as_date(2005))
+apt <- t %>% filter(airport == ap) 
 
-ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
+ggplot(t, aes(x = year, y = Delayed_Arrivals)) +
+  geom_line() +
   scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  geom_vline(xintercept = 2010) +
-  labs(title = "Before- and After-Expansion Capacity at LAX", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
-       x = "Year", 
-       y = "Arrivals")
+  #geom_vline(xintercept = c(2006, 2012)) +
+  facet_wrap(~airport) +
+  labs(title = "Total Delayed Arrivals in ATL by Year")
+
+# ggplot(apt, aes(x = year, y = Prop_On_Time)) +
+#   geom_point() +
+#   geom_vline(xintercept = c(2006, 2012)) +
+#   scale_y_continuous(limits = c(0, 1)) +
+#   labs(title = "Proportion of Flights on Time in ATL by Year")
+
+ap <- "LGA"
+
+lga <- t %>% filter(airport == ap) 
+
+ggplot(lga, aes(x = year, y = Delayed_Arrivals)) +
+  geom_point() +
+  scale_x_continuous(limits = c(2004, 2018)) +
+  geom_vline(xintercept = c(2010)) +
+  labs(title = "Total Delayed Arrivals in LGA by Year")
+
+# ggplot(apt, aes(x = year, y = Prop_On_Time)) +
+#   geom_point() +
+#   geom_vline(xintercept = c(2010)) +
+#   scale_y_continuous(limits = c(0, 1)) +
+#   labs(title = "Proportion of Flights on Time in LGA by Year")
 ```
 
-### ATL plot
+
+### regression discontinuity
+```{r}
+x<-runif(1000,-1,1)
+cov<-rnorm(1000)
+y<-3+2*x+3*cov+10*(x>=0)+rnorm(1000)
+v <- RDestimate(y~x, cutpoint = 0)
+
+plot(v)
+summary(v)
+```
+
+```{r}
+v <- RDestimate(Delayed_Arrivals~year, data = lga)
+
+head(lga)
+```
+
+
+### ATL plots
 ```{r}
 ap <- "ATL"
 
 apt <- t %>% filter(airport == ap) %>%
+  
   mutate(exp_date = as_date(2005))
 
 ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  #geom_line(aes(y = ops)) +
-  geom_vline(xintercept = c(2006, 2012)) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::comma, 
+                     expand = c(0, 0), 
+                     limits = c(0, 500000)) +
+  scale_x_continuous(limits = c(2004, 2018), breaks = seq(2004, 2018, 2)) +
+  geom_ribbon(aes(ymin = 0, ymax = Delayed_Arrivals, fill = "Delayed")) +
+  geom_ribbon(aes(ymin = Delayed_Arrivals,ymax = Actual_Arrivals, fill = "On time")) +
+  scale_fill_manual(values = c("red", "lightblue")) +
+  guides(fill = "legend") +
   labs(title = "Before- and After-Expansion Capacity at ATL", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       subtitle = "Dotted lines show years when a major expansion was completed.",
        x = "Year", 
-       y = "Arrivals")
+       x = "Year", 
+       y = "Arrivals", 
+       fill = "Performance") +
+    geom_vline(xintercept = c(2006, 2012), linetype = 3) 
 ```
 
-### LGA plot
+### LGA plots
 ```{r}
 ap <- "LGA"
 
@@ -67,33 +118,70 @@ apt <- t %>% filter(airport == ap) %>%
   mutate(exp_date = as_date(2005))
 
 ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  #geom_line(aes(y = ops)) +
-  geom_vline(xintercept = c(2010)) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::comma, 
+                     expand = c(0, 0), 
+                     limits = c(0, 200000)) +
+  scale_x_continuous(limits = c(2004, 2018), breaks = seq(2004, 2018, 2)) +
+  geom_ribbon(aes(ymin = Delayed_Arrivals,ymax = Actual_Arrivals, fill = "On time")) +
+    geom_ribbon(aes(ymin = 0, ymax = Delayed_Arrivals, fill = "Delayed")) +
+  scale_fill_manual(values = c("red", "lightblue")) +
+  guides(fill = "legend") +
   labs(title = "Before- and After-Expansion Capacity at LGA", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       subtitle = "Dotted lines show years when a major expansion was completed.",
        x = "Year", 
-       y = "Arrivals")
+       y = "Arrivals", 
+       fill = "Performance") +
+    geom_vline(xintercept = c(2010), linetype = 3) 
+
+
 ```
 
 
-### ORD plot
+### ORD plots
 ```{r}
 ap <- "ORD"
 
-apt <- t %>% filter(airport == ap) %>%
-  mutate(exp_date = as_date(2005))
+apt <- t %>% filter(airport == ap)
 
 ggplot(apt, aes(x = year)) +
-  scale_y_continuous(labels = scales::comma) +
-  scale_x_continuous(limits = c(2004, 2018)) +
-  geom_ribbon(aes(ymax = Actual_Arrivals, ymin = On_Time_Arrivals), color = "steelblue", fill = "steelblue") +
-  #geom_line(aes(y = ops)) +
-  geom_vline(xintercept = c(2008, 2013, 2015), color = "red") +
+  theme_classic() +
+  scale_y_continuous(labels = scales::comma, 
+                     expand = c(0, 0), 
+                     limits = c(0, 500000)) +
+  scale_x_continuous(limits = c(2004, 2018), breaks = seq(2004, 2018, 2)) +
+  geom_ribbon(aes(ymin = Delayed_Arrivals,ymax = Actual_Arrivals, fill = "On time")) +
+    geom_ribbon(aes(ymin = 0, ymax = Delayed_Arrivals, fill = "Delayed")) +
+  scale_fill_manual(values = c("red", "lightblue")) +
+  guides(fill = "legend") +
   labs(title = "Before- and After-Expansion Capacity at ORD", 
-       subtitle = "Upper limit of ribbon shows total arrivals / lower limit shows on-time arrivals",
+       subtitle = "Dotted lines show years when a major expansion was completed.",
        x = "Year", 
-       y = "Arrivals")
+       y = "Arrivals", 
+       fill = "Performance") +
+    geom_vline(xintercept = c(2008, 2013, 2015), linetype = 3) 
+```
+
+### STL plots
+```{r}
+ap <- "STL"
+
+apt <- t %>% filter(airport == ap) 
+
+ggplot(apt, aes(x = year)) +
+  theme_classic() +
+  scale_y_continuous(labels = scales::comma, 
+                     expand = c(0, 0), 
+                     limits = c(0, 100000)) +
+  scale_x_continuous(limits = c(2004, 2018), breaks = seq(2004, 2018, 2)) +
+  geom_ribbon(aes(ymin = Delayed_Arrivals,ymax = Actual_Arrivals, fill = "On time")) +
+    geom_ribbon(aes(ymin = 0, ymax = Delayed_Arrivals, fill = "Delayed")) +
+  scale_fill_manual(values = c("red", "lightblue")) +
+  guides(fill = "legend") +
+  labs(title = "Before- and After-Expansion Capacity at STL", 
+       subtitle = "Dotted lines show years when a major expansion was completed.",
+       x = "Year", 
+       y = "Arrivals", 
+       fill = "Performance") +
+geom_vline(xintercept = c(2006), linetype = 3) 
 ```
