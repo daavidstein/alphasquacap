@@ -18,6 +18,71 @@ library(viridis)
 library(lubridate)
 ```
 
+### set up colors
+```{r}
+my_colors <- function (palette = "cb"){
+    cb.palette <- c("#5e3c99", "#E69F00", "#56B4E9", "#009E73", 
+        "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+    rcb.palette <- rev(cb.palette)
+    two.palette <- c("#ef8a62", # green
+                     "#67a9cf") # eggplant
+    if (palette == "cb") 
+        return(cb.palette)
+    else if (palette == "rcb") 
+        return(rcb.palette)
+    else if (palette == "two") 
+        return(two.palette)
+    else stop("Choose cb, rcb, or two only.")
+}
+```
+
+### Set up fonts
+```{r}
+library(showtext)
+## Loading Google fonts (http://www.google.com/fonts)
+font_add_google("spectral", "spectral")
+font_add_google("roboto slab", "roboto")
+
+## Automatically use showtext to render text for future devices
+showtext_auto()
+```
+
+## Arrival & delay density plots
+### Import data
+```{r}
+samp <- read.csv("/Users/james/Downloads/759366606_T_ONTIME_REPORTING.csv")
+```
+
+### Munge & plot
+```{r}
+samp2 <- samp %>%
+  dplyr::select(ARR_DELAY, DEP_DELAY) %>%
+  gather(delay_type, minutes) %>%
+  mutate(delay_type = recode(delay_type, "ARR_DELAY" = "Arrival delays", 
+                             "DEP_DELAY" = "Departure delays"))
+
+
+ggplot(samp2, aes(x = delay_type, y = minutes, fill = delay_type, color = delay_type)) +
+  theme_minimal() +
+  scale_fill_manual(values = my_colors("two")) +
+  scale_color_manual(values = my_colors("two")) +
+  scale_y_continuous(limits = c(-50, 120), breaks = seq(-50, 130, 50)) +
+  scale_x_discrete(labels = scales::wrap_format(5)) +
+  geom_violin() +
+  coord_flip() +
+  theme(text=element_text(size=16,family="roboto"), 
+        plot.title = element_text(size=22)) +
+  labs(title = "", 
+       x="", y = "Length of delay in minutes") +
+  guides(color = FALSE, fill = FALSE)
+```
+
+```{r}
+
+```
+
+
+
 ## ATL
 ### import ATL and munge data
 ```{r}
@@ -46,7 +111,7 @@ ggplot(plot_atl, aes(x = deps, y = arrs)) +
   scale_x_continuous() +
   scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
   geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
-  facet_wrap(~year, nrow = 3, ncol = 5)  +
+  facet_wrap(~year)  +
   labs(title = "Hourly Operations Over Time at ATL", 
        color = "Hourly on-time-ness")
 ```
@@ -64,7 +129,6 @@ ggplot(plot_atl_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat
   geom_line() +
   labs(title = "Proportion of Timely Hours at ATL", 
        color = "On-timeness of hours")
-
 ```
 
 ### ATL: on_timearrivals only
@@ -263,7 +327,7 @@ ggplot(plot_lga, aes(x = deps, y = arrs)) +
 ## STL
 ### import STL and munge data
 ```{r}
-path <- here::here("data", "hourly", "ord.csv")
+path <- here::here("data", "hourly", "stl.csv")
 stl <- read.csv(path)
 names(stl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
 
@@ -291,6 +355,112 @@ ggplot(plot_stl, aes(x = deps, y = arrs)) +
   geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
   facet_wrap(~year, nrow = 3, ncol = 5) +
   labs(title = "Hourly Operations Over Time at STL", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
+```
+
+## LAS
+### import LAS and munge data
+```{r}
+path <- here::here("data", "hourly", "las.csv")
+las <- read.csv(path)
+names(las) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+las <- las %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(las)
+```
+
+### LAS: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+
+plot_las <- las %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_las, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year) +
+  labs(title = "Hourly Operations Over Time at LAS", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
+```
+
+
+## DTW
+### import DTW and munge data
+```{r}
+path <- here::here("data", "hourly", "dtw.csv")
+dtw <- read.csv(path)
+names(dtw) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+dtw <- dtw %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(dtw)
+```
+
+### DTW: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+
+plot_dtw <- dtw %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_dtw, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year) +
+  labs(title = "Hourly Operations Over Time at DTW", 
+       color = "Hourly on-time-ness")
+# ggMarginal(p, type="boxplot", size=7)
+```
+
+## fll
+### import fll and munge data
+```{r}
+path <- here::here("data", "hourly", "fll.csv")
+fll <- read.csv(path)
+names(fll) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+fll <- fll %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del, 
+         total_delays = deps_del + arrs_del) 
+
+head(fll)
+```
+
+### fll: prop_delay mapped to color
+```{r fig.height=4, fig.width=6}
+
+plot_fll <- fll %>%
+  filter(hour > 6, hour < 12) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+
+ggplot(plot_fll, aes(x = deps, y = arrs)) +
+  theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
+  facet_wrap(~year) +
+  labs(title = "Hourly Operations Over Time at fll", 
        color = "Hourly on-time-ness")
 # ggMarginal(p, type="boxplot", size=7)
 ```
