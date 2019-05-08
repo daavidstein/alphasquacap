@@ -17,9 +17,11 @@ library(tidyverse)
 library(stringr)
 library(here)
 library(lubridate)
+library(nlme)
+library(ggrepel)
 
-path <- here::here("data", "StandardReport.csv")
-standard <- read_csv(path)
+
+standard <- read_csv("C:/Users/Austin/Documents/Academics/NCF/Semester_2/Distributed/Proj_2/Airlines_repo/alphasquacap/data/StandardReport.csv")
 
 # Removes stupid government tallies
 standard <- standard %>%
@@ -28,6 +30,8 @@ standard <- standard %>%
 # Converts Month-Year (JUN-13) to Date Format (2013-06-01)
 standard$Date <- as.Date(sub("\\-", "01", standard$Date), "%b%d%y")
 ```
+
+# Discontinuity
 
 ```{r}
 # Getting general arrival demand shape by filtering to TPA:
@@ -291,5 +295,112 @@ ggplot(standard_cvg,aes(x=Date,y=On_Time_Arrivals))+
   geom_smooth() +
   ggtitle(label = "On-Time Flight Arrivals Total for CVG") +
   labs(y = "Total On-Time Flight Arrivals") +
+  theme_minimal()
+```
+
+# Coefficient Comparisons
+
+Example of WTF we're doing:
+```{r}
+# Fitting linear model to all airports for last 4 years:
+four_year_standard <- standard %>%
+  filter(Date >= "2015-02-01")
+
+# Percent On-Time Arrivals (OPS) for SEA:
+ggplot(standard_sea,aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_smooth(data=subset(standard_sea, Date >= "2015-02-01"), aes(color = "2"), method='lm',formula=y~x,se=T) +
+  ggtitle(label = "On-Time Flight Arrivals Total for SEA") +
+  labs(y = "Total On-Time Flight Arrivals") +
+  theme_minimal()
+```
+
+```{r}
+prop_on_time_fit <- lmList(Perc_On_Time_Gate_Arrs ~ Date | Facility, data=four_year_standard, pool=FALSE)
+
+prop_on_time_coefs <- coef(prop_on_time_fit) %>%
+  tibble::rownames_to_column() %>%
+  rename(Facility = rowname, prop_coef = Date) %>%
+  select(Facility, prop_coef) %>%
+  mutate(Date = prop_coef*30.42) %>%
+  arrange(desc(prop_coef)) %>%
+  mutate(prop_coef_type = ifelse(prop_coef <= 0, "below", "above"))
+
+prop_on_time_coefs <- prop_on_time_coefs[order(prop_on_time_coefs$prop_coef), ] #Ascending sort on Z Score
+prop_on_time_coefs$Facility <- factor(prop_on_time_coefs$Facility, levels = prop_on_time_coefs$Facility)
+
+
+ggplot(prop_on_time_coefs, aes(x=Facility, y=prop_coef, label=prop_coef)) +
+  geom_bar(stat='identity', aes(fill=prop_coef_type), width=.5) +
+  scale_fill_manual(name="Coefficient",
+                    labels = c("Improving", "Declining"),
+                    values = c("above"="#00ba38", "below"="#0b8fd3")) +
+  labs(title= "Diverging Bar Plot of Percent On-Time Arrival Coefficients") +
+  coord_flip()
+```
+
+```{r}
+four_year_standardized_standard <- standard %>%
+  filter(Date >= "2015-02-01") %>%
+  group_by(Facility) %>%
+  mutate(std.On_Time_Arrivals = scale(On_Time_Arrivals))
+  
+
+arr_on_time_fit <- lmList(std.On_Time_Arrivals ~ Date | Facility, data=four_year_standardized_standard, pool=FALSE)
+
+arr_on_time_coefs <- coef(arr_on_time_fit) %>%
+  tibble::rownames_to_column() %>%
+  rename(Facility = rowname, arr_coef = Date) %>%
+  select(Facility, arr_coef) %>%
+  mutate(arr_coef = arr_coef*30.42) %>%
+  arrange(desc(arr_coef)) %>%
+  mutate(arr_coef_type = ifelse(arr_coef <= 0, "below", "above"))
+
+
+arr_on_time_coefs <- arr_on_time_coefs[order(arr_on_time_coefs$arr_coef), ] #Ascending sort on Z Score
+arr_on_time_coefs$Facility <- factor(arr_on_time_coefs$Facility, levels = arr_on_time_coefs$Facility)
+
+
+ggplot(arr_on_time_coefs, aes(x=Facility, y=arr_coef, label=arr_coef)) +
+  geom_bar(stat='identity', aes(fill=arr_coef_type), width=.5) +
+  scale_fill_manual(name="Coefficient",
+                    labels = c("Improving", "Declining"),
+                    values = c("above"="#00ba38", "below"="#0b8fd3")) +
+  labs(title= "Diverging Bar Plot of Standardized On-Time Arrival Coefficients") +
+  coord_flip()
+```
+
+```{r}
+merged_coefs <- merge(prop_on_time_coefs, arr_on_time_coefs, by=c("Facility"))
+
+ggplot(merged_coefs, aes(x = prop_coef, y = arr_coef)) +
+  geom_vline(xintercept = 0, linetype='dashed') +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point() +
+  ggrepel::geom_text_repel(aes(label = Facility)) +
+  ggtitle(label = "Scatterplot of Arrival On-Time and Proportion On-Time Coefficients") +
+  labs(x = "Change in Proportion On-Time", y = "Change in Arrivals On-Time") +
+  theme_minimal()
+```
+
+```{r}
+# Let's look at WTF is happening at EWR:
+standard_ewr <- standard %>%
+  filter(Facility == 'EWR')
+
+# Percent on time arrivals for EWR:
+ggplot(standard_ewr,aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_smooth() +
+  ggtitle(label = "On-Time Flight Arrivals Percent for EWR") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  labs(y = "Percent On-Time") +
+  theme_minimal()
+
+ggplot(standard_ewr,aes(x=Date,y=On_Time_Arrivals))+
+  geom_point() +
+  geom_smooth() +
+  ggtitle(label = "On-Time Flight Arrival Total for EWR") +
+  labs(y = "Total On-Time Arrivals") +
   theme_minimal()
 ```
