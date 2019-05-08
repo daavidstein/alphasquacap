@@ -16,56 +16,150 @@ library(tidyverse)
 library(readxl)
 library(viridis)
 library(lubridate)
+library(glue)
 ```
 
-## ATL
-### import ATL and munge data
+### set up colors
 ```{r}
-path <- here::here("data", "hourly", "atl.csv")
-atl <- read.csv(path)
-names(atl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+eggplant <- "#403891FF"
 
-atl <- atl %>%
+my_colors <- function (palette = "cb"){
+    cb.palette <- c("#5e3c99", "#E69F00", "#56B4E9", "#009E73", 
+        "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+    rcb.palette <- rev(cb.palette)
+    two.palette <- c("#EB8055FF", # green #EB8055FF", "#403891FF","#E8FA5BFF"
+                     "#403891FF") # eggplant
+    if (palette == "cb") 
+        return(cb.palette)
+    else if (palette == "rcb") 
+        return(rcb.palette)
+    else if (palette == "two") 
+        return(two.palette)
+    else stop("Choose cb, rcb, or two only.")
+}
+```
+
+### Set up fonts
+```{r}
+library(showtext)
+## Loading Google fonts (http://www.google.com/fonts)
+font_add_google("spectral", "spectral")
+font_add_google("roboto slab", "roboto")
+
+## Automatically use showtext to render text for future devices
+showtext_auto()
+
+theme_set(theme_minimal() + theme(text=element_text(size=16,family="roboto"), 
+              plot.title = element_text(size=22), 
+              plot.margin = unit(c(1,1,1,1), "cm")))
+```
+
+
+## Arrival & delay density plots
+### Import data
+```{r}
+samp <- read.csv("/Users/james/Downloads/759366606_T_ONTIME_REPORTING.csv")
+```
+
+### Munge & plot
+```{r}
+samp2 <- samp %>%
+  dplyr::select(ARR_DELAY, DEP_DELAY) %>%
+  gather(delay_type, minutes) %>%
+  mutate(delay_type = recode(delay_type, "ARR_DELAY" = "Arrival delays", 
+                             "DEP_DELAY" = "Departure delays"))
+
+ggplot(samp2, aes(x = delay_type, y = minutes, fill = delay_type, color = delay_type)) +
+  scale_fill_manual(values = my_colors("two")) +
+  scale_color_manual(values = my_colors("two")) +
+  scale_y_continuous(limits = c(-50, 120), breaks = seq(-50, 130, 50)) +
+  scale_x_discrete(labels = scales::wrap_format(5)) +
+  geom_violin() +
+  coord_flip() +
+
+  labs(title = "", 
+       x="", y = "Length of delay in minutes") +
+  guides(color = FALSE, fill = FALSE)
+```
+
+## Hourly dotplots
+### One year at a time
+```{r fig.height=4, fig.width=4}
+
+plot_hourly_1y <- function(file_name, year_idx, title){
+  path <- here::here("data", "hourly", file_name)
+  atl <- read.csv(path)
+  names(atl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+  
+  atl <- atl %>%
+  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
+         arrs_on_time = arrs - arrs_del, 
+         deps_on_time = deps - deps_del) %>%
+  select(-arrs_del, -deps_del) %>%
+  filter(hour > 6, hour < 12, 
+         year == year_idx) %>%
+  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
+                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+  
+  ggplot(atl, aes(x = deps, y = arrs)) +
+  #theme_minimal() +
+  scale_x_continuous() +
+  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  geom_jitter(aes(color = delay_cat), alpha = 1, size = 1, width = 0.5, height = 0.5) +
+  labs(title = glue(title, " in ", year_idx), 
+       color = "Hourly performance", 
+       x = "Arrivals", 
+       y = "Departures") +
+    guides(color = FALSE)
+  
+}
+
+
+plot_hourly_1y("atl.csv", 2004, "Hourly Operations at ATL")
+#plot_hourly_1y("atl.csv", 2006, "Hourly Operations at ATL")
+#plot_hourly_1y("atl.csv", 2014, "Hourly Operations at ATL")
+
+?ggsave
+
+ggsave("../plots/atl_hourly_2004.jpeg", width = 4, height = 4, 
+       device = "jpeg", dpi = 300)
+```
+
+### Faceted by year
+```{r}
+plot_hourly <- function(file_name, title){
+  path <- here::here("data", "hourly", file_name)
+  atl <- read.csv(path)
+  names(atl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+  
+  atl <- atl %>%
   mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
          arrs_on_time = arrs - arrs_del, 
          deps_on_time = deps - deps_del) %>%
   select(-arrs_del, -deps_del)
-
-head(atl)
-```
-
-### ATL: prop_delay mapped to color
-```{r fig.height=4, fig.width=6}
-plot_atl <- atl %>%
+  
+  plot_atl <- atl %>%
   filter(hour > 6, hour < 12) %>%
   mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
                            ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
-
-ggplot(plot_atl, aes(x = deps, y = arrs)) +
-  theme_minimal() +
+  
+  ggplot(plot_atl, aes(x = deps, y = arrs)) +
   scale_x_continuous() +
   scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
-  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
-  facet_wrap(~year, nrow = 3, ncol = 5)  +
-  labs(title = "Hourly Operations Over Time at ATL", 
+  geom_point(aes(color = delay_cat), alpha = 1, size = .2) +
+  facet_wrap(~year)  +
+  labs(title = title, 
        color = "Hourly on-time-ness")
+  
+}
+
+#plot_hourly("atl_no_wx.csv", "Hourly Operations Over Time at ATL (bad weather excluded)")
+#plot_hourly("atl.csv", "Hourly Operations Over Time at ATL")
+#plot_hourly("fll.csv", "Hourly Operations Over Time at FLL")
+plot_hourly("stl.csv", "Hourly Operations Over Time at STL")
 ```
 
-### ATL proportion chart
-```{r}
-plot_atl_2 <- plot_atl %>%
-  group_by(year, delay_cat) %>%
-  summarize(n = n() ) %>%
-  mutate(prop = n/sum(n))
 
-ggplot(plot_atl_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
-  theme_minimal() +
-  scale_y_continuous(limits = c(0, 1)) +
-  geom_line() +
-  labs(title = "Proportion of Timely Hours at ATL", 
-       color = "On-timeness of hours")
-
-```
 
 ### ATL: on_timearrivals only
 ```{r fig.height=5, fig.width=5}
@@ -85,57 +179,37 @@ ggplot(plot_atl, aes(x = deps, y = arrs)) +
   labs(title = "ATL: all arrivals and departures")
 ```
 
-## ORD
-### import ORD and munge data
+
+### ATL proportion chart
 ```{r}
-path <- here::here("data", "hourly", "ord.csv")
-ord <- read.csv(path)
-names(ord) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
-
-ord <- ord %>%
-  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
-         arrs_on_time = arrs - arrs_del, 
-         deps_on_time = deps - deps_del, 
-         total_delays = deps_del + arrs_del) 
-
-head(ord)
-```
-
-### ORD: prop_delay mapped to color
-```{r fig.height=4, fig.width=6}
-library(cowplot)
-library(ggExtra)
-
-
-
-plot_ord <- ord %>%
-  filter(hour > 6, hour < 12) %>%
-  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
-                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
-
-ggplot(plot_ord, aes(x = deps, y = arrs)) +
-  theme_minimal() +
-  scale_x_continuous() +
-  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
-  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
-  facet_wrap(~year, nrow = 3, ncol = 5) +
-  labs(title = "Hourly Operations Over Time at ORD", 
-       color = "Hourly on-time-ness")
-# ggMarginal(p, type="boxplot", size=7)
-```
-```{r}
-plot_ord_2 <- plot_ord %>%
+plot_atl_2 <- plot_atl %>%
   group_by(year, delay_cat) %>%
   summarize(n = n() ) %>%
   mutate(prop = n/sum(n))
 
-ggplot(plot_ord_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
+ggplot(plot_atl_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 1)) +
   geom_line() +
-  labs(title = "Proportion of Timely Hours at ORD", 
+  labs(title = "Proportion of Timely Hours at ATL", 
        color = "On-timeness of hours")
 ```
+
+### ATL proportion chart
+```{r}
+plot_atl_2 <- plot_atl %>%
+  group_by(year, delay_cat) %>%
+  summarize(n = n() ) %>%
+  mutate(prop = n/sum(n))
+
+ggplot(plot_atl_2, aes(x = year, y = prop , group = delay_cat, color = delay_cat)) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 1)) +
+  geom_line() +
+  labs(title = "Proportion of Timely Hours at ATL", 
+       color = "On-timeness of hours")
+```
+
 
 
 ### Just delays
@@ -160,43 +234,6 @@ ggplot(plot_ord, aes(x = deps_del, y = arrs_del)) +
   labs(title = "Arrivals and Departures at ORD")
 ```
 
-```{r}
-library(glue)
-
-head(atl)
-
-
-atl_ <- atl %>%
-  filter(hour > 6, hour < 12) %>%
-  mutate(date = mdy(glue("{month}-", "{day}-", "{year}")),
-         num_date = as.numeric((date)),
-         delayed_arrivals = deps - deps_on_time) 
-
-atl_agg <- atl %>%
-  filter(hour > 6, hour < 12) %>%
-  mutate(date = mdy(glue("{month}-", "{day}-", "{year}")),
-         num_date = as.numeric((date)),
-         delayed_arrivals = deps - deps_on_time) %>%
-  group_by(month) %>%
-  summarize(mean_delayed_arrs = mean(delayed_arrivals))
-
-ggplot(atl_agg, aes(x = month, y = mean_delayed_arrs)) +
-  geom_line()
-
-cutoff <- as.numeric(mdy("5-1-2006"))
-
-v <- RDestimate(delayed_arrivals~num_date, 
-                cutpoint = cutoff, 
-                kernel = "gaussian",
-                bw = 200,
-                data = atl_)
-
-plot(v)
-summary(v)
-plot(atl_$num_date, atl_$arrs_on_time)
-
-
-```
 
 
 ```{r}
@@ -221,9 +258,15 @@ ggplot(atl_max, aes(x = year, y = mean_max)) +
 ## LGA
 ### import LGA and munge data
 ```{r}
-path <- here::here("data", "hourly", "lga.csv")
-lga <- read.csv(path)
-names(lga) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+path <- here::here("data", "hourly", "atl.csv")
+atl <- read.csv(path)
+names(atl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+
+head(atl)
+
+tes <- atl %>%
+  filter(year == 2004)
+
 
 lga <- lga %>%
   mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
@@ -234,63 +277,110 @@ lga <- lga %>%
 head(lga)
 ```
 
-### LGA: prop_delay mapped to color
-```{r fig.height=4, fig.width=6}
-library(cowplot)
-library(ggExtra)
 
-
-
-plot_lga <- lga %>%
-  filter(hour > 6, hour < 12) %>%
-  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
-                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
-
-ggplot(plot_lga, aes(x = deps, y = arrs)) +
-  theme_minimal() +
-  scale_x_continuous() +
-  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
-  geom_point(aes(color = delay_cat), alpha = 1, size = .4, position = "jitter") +
-  facet_wrap(~year, nrow = 3, ncol = 5) +
-  labs(title = "Hourly Operations Over Time at LGA", 
-       color = "Hourly on-time-ness")
-# ggMarginal(p, type="boxplot", size=7)
-
-
-```
-
-
-## STL
-### import STL and munge data
+## Discontinuity examples
+### No discontinuity
 ```{r}
-path <- here::here("data", "hourly", "ord.csv")
-stl <- read.csv(path)
-names(stl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
+# Discontinuity Regression with signal:
+set.seed(223)
+x <- seq(1,20,.25)
+y_before <- rnorm(37, -1.5, 1.5) +x[1:37]*(1/2)
+y_after <- rnorm(40, -3, 3) + (x[38:77])*4 - 30
 
-stl <- stl %>%
-  mutate(prop_del = ( (arrs_del+deps_del) / (arrs+deps)), 
-         arrs_on_time = arrs - arrs_del, 
-         deps_on_time = deps - deps_del, 
-         total_delays = deps_del + arrs_del) 
+example_df <- data.frame(x,c(y_before, y_after))
+names(example_df)[2] <- "y"
 
-head(stl)
+# Plot of signal:
+ggplot(example_df,aes(x=x,y=y))+
+  geom_point() +
+  geom_point(data=subset(example_df, x <= 10), color = "grey25") +
+  geom_smooth(data=subset(example_df, x <= 10), 
+              aes(color = "1"), method='lm',formula=y~x,se=T, 
+              fill = "grey55") +
+  geom_point(data=subset(example_df, x > 10), color = "grey25") +
+  geom_smooth(data=subset(example_df, x > 10), 
+              aes(color  = "2"), method='lm',formula=y~x,se=T, 
+              fill = "grey55") +
+  geom_vline(xintercept = 10, linetype='dashed') +
+  ggtitle(label = "") +
+  scale_color_manual(values = c("1" = my_colors("two")[1],"2" = my_colors("two")[2]),
+                     labels = c("Before", "After")) +
+  labs(x = "Time", y = "Response", color = "Treatment Period") +
+  theme(legend.position="bottom")
+
+before <- lm(y~x, data = example_df, subset = (x <= 10))
+summary(before)
+
+after <- lm(y~x, data = example_df, subset = (x > 10))
+summary(after)
+
+ggsave("../plots/discont.jpeg", device = "jpeg", width = 6, height = 4, dpi = 300)
 ```
 
-### STL: prop_delay mapped to color
-```{r fig.height=4, fig.width=6}
+### No discontinuity
+```{r}
+# Discontinuity Regression with NO signal:
+set.seed(223)
+x <- seq(1,20,.25)
+y_before <- rnorm(37, -.5, .5) +x[1:37]*(1/3)
+y_after <- rnorm(40, -.5, .5) + x[38:77]*(1/3)
 
-plot_stl <- stl %>%
-  filter(hour > 6, hour < 12) %>%
-  mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
-                           ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
+example_df <- data.frame(x,c(y_before, y_after))
+names(example_df)[2] <- "y"
 
-ggplot(plot_stl, aes(x = deps, y = arrs)) +
-  theme_minimal() +
-  scale_x_continuous() +
-  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
-  geom_point(aes(color = delay_cat), alpha = 1, size = .4) +
-  facet_wrap(~year, nrow = 3, ncol = 5) +
-  labs(title = "Hourly Operations Over Time at STL", 
-       color = "Hourly on-time-ness")
-# ggMarginal(p, type="boxplot", size=7)
+# Plot of NO signal:
+ggplot(example_df,aes(x=x,y=y))+
+  geom_point() +
+  geom_point(data=subset(example_df, x <= 10), color = "grey25") +
+  geom_smooth(data=subset(example_df, x <= 10), 
+              aes(color = "1"), method='lm',formula=y~x,se=T, 
+              fill = "grey55") +
+  geom_point(data=subset(example_df, x > 10), color = "grey25") +
+  geom_smooth(data=subset(example_df, x > 10), 
+              aes(color  = "2"), method='lm',formula=y~x,se=T, 
+              fill = "grey55") +
+  geom_vline(xintercept = 10, linetype='dashed') +
+  ggtitle(label = "") +
+  scale_color_manual(values = c("1" = my_colors("two")[1],"2" = my_colors("two")[2]),
+                     labels = c("Before", "After")) +
+  labs(x = "Time", y = "Response", color = "Treatment Period") +
+  theme(legend.position="bottom")
+
+before <- lm(y~x, data = example_df, subset = (x <= 10))
+summary(before)
+
+after <- lm(y~x, data = example_df, subset = (x > 10))
+summary(after)
+
+ggsave("../plots/no_discont.jpeg", device = "jpeg", width = 6, height = 4, dpi = 300)
+```
+
+## Discontinuity cases
+### Load in StandardReport
+```{r}
+path <- here::here("data", "StandardReport.csv")
+standard <- read_csv(path)
+
+# Removes stupid government tallies
+standard <- standard %>%
+  filter(!str_detect(Date, 'Sub-Total'))
+
+# Converts Month-Year (JUN-13) to Date Format (2013-06-01)
+standard$Date <- as.Date(sub("\\-", "01", standard$Date), "%b%d%y")
+```
+### TPA's "typical curve"
+```{r}
+# Getting general arrival demand shape by filtering to TPA:
+standard_tpa <- standard %>%
+  filter(Facility == 'TPA')
+
+# Total On-Time Arrivals (OPS) for TPA:
+ggplot(standard_tpa,aes(x=Date,y=On_Time_Arrivals)) +
+  scale_y_continuous(labels = scales::comma) +
+  geom_point() +
+  geom_smooth(color = eggplant) +
+  ggtitle(label = "") +
+  labs(y = "Total On-Time Flight Arrivals") 
+
+ggsave("../plots/typical_curve.jpeg", device = "jpeg", width = 6, height = 4, dpi = 300)
 ```
