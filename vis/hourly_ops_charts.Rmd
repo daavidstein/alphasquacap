@@ -23,14 +23,13 @@ library(glue)
 ```{r}
 eggplant <- "#403891FF"
 
-my_colors <- function (palette = "cb"){
-    cb.palette <- c("#5e3c99", "#E69F00", "#56B4E9", "#009E73", 
-        "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-    rcb.palette <- rev(cb.palette)
+my_colors <- function (palette = "dis"){
+    dis.palette <- c("#a6cee3", "#ff7f00")
+    rcb.palette <- rev(dis.palette)
     two.palette <- c("#EB8055FF", # green #EB8055FF", "#403891FF","#E8FA5BFF"
                      "#403891FF") # eggplant
-    if (palette == "cb") 
-        return(cb.palette)
+    if (palette == "dis") 
+        return(dis.palette)
     else if (palette == "rcb") 
         return(rcb.palette)
     else if (palette == "two") 
@@ -86,7 +85,7 @@ ggplot(samp2, aes(x = delay_type, y = minutes, fill = delay_type, color = delay_
 ### One year at a time
 ```{r fig.height=4, fig.width=4}
 
-plot_hourly_1y <- function(file_name, year_idx, title){
+plot_hourly_1y <- function(file_name, year_idx, title, x_max, y_max){
   path <- here::here("data", "hourly", file_name)
   atl <- read.csv(path)
   names(atl) <- c("year", "month", "day", "hour", "arrs", "arrs_del", "deps", "deps_del")
@@ -103,10 +102,23 @@ plot_hourly_1y <- function(file_name, year_idx, title){
   
   ggplot(atl, aes(x = deps, y = arrs)) +
   #theme_minimal() +
-  scale_x_continuous() +
-  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
+  scale_x_continuous(limits = c(0, x_max)) +
+  scale_y_continuous(limits = c(0, y_max)) +
+    scale_color_manual("", 
+                breaks = c("90% on time", "80% on time",
+                           "Worse than 80%"),
+                values = c( "#ff6699",
+                            "#403891FF", 
+                            
+                             
+                            "#cccc00"
+                           ), 
+                labels = c("90% on time", "80% on time",
+                           "Worse than 80%")) +
+    #scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
   geom_jitter(aes(color = delay_cat), alpha = 1, size = 1, width = 0.5, height = 0.5) +
-  labs(title = glue(title, " in ", year_idx), 
+  #geom_bin2d(bins = 40) +
+    labs(title = glue(title), 
        color = "Hourly performance", 
        x = "Arrivals", 
        y = "Departures") +
@@ -114,9 +126,14 @@ plot_hourly_1y <- function(file_name, year_idx, title){
   
 }
 
+#plot_hourly_1y("atl.csv", 2004, "Hourly Operations at ATL")
+plot_hourly_1y("atl.csv", 2005, "Pre-Expansion ATL: 2005", 120, 120)
+plot_hourly_1y("atl.csv", 2008, "Post-Expansion ATL: 2008", 120, 120)
 
-plot_hourly_1y("atl.csv", 2004, "Hourly Operations at ATL")
-#plot_hourly_1y("atl.csv", 2006, "Hourly Operations at ATL")
+plot_hourly_1y("stl.csv", 2005, "Pre-Expansion STL: 2005", 25, 25)
+plot_hourly_1y("stl.csv", 2008, "Post-Expansion STL: 2008", 25, 25)
+#plot_hourly_1y("atl.csv", 2016, "Hourly Operations at ATL")
+#plot_hourly_1y("atl.csv", 2018, "Hourly Operations at ATL")
 #plot_hourly_1y("atl.csv", 2014, "Hourly Operations at ATL")
 
 ?ggsave
@@ -126,7 +143,7 @@ ggsave("../plots/atl_hourly_2004.jpeg", width = 4, height = 4,
 ```
 
 ### Faceted by year
-```{r}
+```{r fig.height=4, fig.width=6}
 plot_hourly <- function(file_name, title){
   path <- here::here("data", "hourly", file_name)
   atl <- read.csv(path)
@@ -140,23 +157,41 @@ plot_hourly <- function(file_name, title){
   
   plot_atl <- atl %>%
   filter(hour > 6, hour < 12) %>%
+  filter(year > 2000) %>%
   mutate(delay_cat = ifelse(prop_del < .1, "90% on time", 
                            ifelse(prop_del < .2, "80% on time", "Worse than 80%"))) 
   
   ggplot(plot_atl, aes(x = deps, y = arrs)) +
-  scale_x_continuous() +
-  scale_color_manual(values = c("#EB8055FF", "#403891FF","#E8FA5BFF")) +
-  geom_point(aes(color = delay_cat), alpha = 1, size = .2) +
-  facet_wrap(~year)  +
-  labs(title = title, 
-       color = "Hourly on-time-ness")
+  scale_x_continuous(limits = c(0, 120), breaks = c(60, 120)) +
+    scale_color_manual("", 
+                breaks = c("90% on time", "80% on time",
+                           "Worse than 80%"),
+                values = c( "#ff6699",
+                            "#403891FF", 
+                            
+                             
+                            "#cccc00"
+                           ), 
+                labels = c("90% on time", "80% on time",
+                           "Worse than 80%")) +
+    geom_point(aes(color = delay_cat), alpha = 1, size = .2) +
+  #facet_wrap(~year)  +
+  facet_wrap(~year, ncol = 6) +
+  labs(title = "", 
+       color = "Hourly performance", 
+       x = "Arrivals", 
+       y = "Departures",
+       color = "Hourly on-time-ness") +
+    guides(color = FALSE)
   
 }
+
+?facet_wrap
 
 #plot_hourly("atl_no_wx.csv", "Hourly Operations Over Time at ATL (bad weather excluded)")
 #plot_hourly("atl.csv", "Hourly Operations Over Time at ATL")
 #plot_hourly("fll.csv", "Hourly Operations Over Time at FLL")
-plot_hourly("stl.csv", "Hourly Operations Over Time at STL")
+plot_hourly("atl.csv", "Hourly Operations Over Time at ATL")
 ```
 
 
@@ -383,4 +418,270 @@ ggplot(standard_tpa,aes(x=Date,y=On_Time_Arrivals)) +
   labs(y = "Total On-Time Flight Arrivals") 
 
 ggsave("../plots/typical_curve.jpeg", device = "jpeg", width = 6, height = 4, dpi = 300)
+```
+
+```{r}
+  standard_air <- standard %>%
+    filter(Facility == "ATL")
+
+  ggplot(standard_air,aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+    geom_point() +
+    geom_point(data=subset(standard_sea, Date >= "2009-12-01")) +
+    geom_smooth(data=subset(standard_sea, Date >= "2009-12-01"), 
+                aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2]) +
+    geom_point(data=subset(standard_sea, Date <= "2008-12-01")) +
+    geom_smooth(data=subset(standard_sea, Date <= "2008-12-01"), 
+                aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1]) +
+    geom_vline(xintercept = as.numeric(as.Date("2009-12-01")), linetype='dashed') +
+    geom_vline(xintercept = as.numeric(as.Date("2008-12-01")), linetype='dashed') +
+    ggtitle(label = "") +
+    scale_y_continuous(labels = function(x) paste0(x, "%")) +
+    scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                  "2" = my_colors("dis")[1]),
+                       labels = c("Before","After")) 
+    labs(y = "Percent On-Time", color = "Expansion Period", x = "") +
+    annotate("label", x = as.Date("2008-12-01"), y = 66.25, 
+             label = "11/20/08", size = 4) +
+    theme(axis.text.x = element_text(size = 18), 
+          axis.text.y = element_text(size=18)) 
+```
+
+### SEA discont
+#### on-time arrs
+```{r fig.height=4.5, fig.width=6}
+standard_air <- standard %>%
+  filter(Facility == "FLL")
+
+ggplot(standard_a, aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_point(data=subset(standard_air, Date >= "2009-12-01")) +
+  geom_smooth(data=subset(standard_air, Date >= "2009-12-01"), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= "2008-12-01")) +
+  geom_smooth(data=subset(standard_air, Date <= "2008-12-01"), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+  geom_vline(xintercept = as.numeric(as.Date("2009-12-01")), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date("2008-12-01")), linetype='dashed') +
+  ggtitle(label = "") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "Percent On-Time", color = "Expansion Period", x = "") +
+  annotate("label", x = as.Date("2008-12-01"), y = 66.25, 
+           label = "11/20/08", size = 4) +
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+
+ggsave("../plots/fll_arrs.jpeg", width = 4.5, height = 6, 
+       device = "jpeg", dpi = 300)
+```
+
+#### % arrivals on-time
+```{r fig.height=4.5, fig.width=6}
+
+standard_air <- standard %>%
+  filter(Facility == "FLL")
+
+before_date <- "2014-08-01"
+after_date <- "2015-07-01"
+
+ggplot(standard_air,aes(x=Date,y=On_Time_Arrivals))+
+    geom_point() +
+  scale_y_continuous(labels = scales::comma_format(scale = .001, suffix = "k") ) +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+  geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+  ggtitle(label = "") +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "On-Time Flight Arrivals", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+
+
+```
+
+### FLL discont
+#### on-time arrs
+```{r fig.height=4.5, fig.width=6}
+  
+standard_air <- standard %>%
+  filter(Facility == "FLL")
+
+before_date <- "2014-08-01"
+after_date <- "2015-07-01"
+
+ggplot(standard_a, aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+    ggtitle(label = "") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "Percent On-Time", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+
+ggsave("../plots/fll_arrs.jpeg", width = 4.5, height = 6, 
+       device = "jpeg", dpi = 300)
+```
+
+#### % arrivals on-time
+```{r}
+
+```
+
+### ATL discont
+#### # arrivals on-time
+```{r fig.height=4.5, fig.width=6}
+
+standard_air <- standard %>%
+  filter(Facility == "ATL")
+
+before_date <- "2006-04-01"
+after_date <- "2007-04-01"
+
+ggplot(standard_air,aes(x=Date,y=On_Time_Arrivals))+
+    geom_point() +
+  scale_y_continuous(labels = scales::comma_format(scale = .001, suffix = "k") ) +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+  geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+  ggtitle(label = "") +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "On-Time Flight Arrivals", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+
+
+```
+#### % arrivals on-time
+```{r fig.height=4.5, fig.width=6}
+standard_air <- standard %>%
+  filter(Facility == "ATL")
+
+before_date <- "2006-04-01"
+after_date <- "2007-04-01"
+
+ggplot(standard_a, aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+    ggtitle(label = "") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "Percent On-Time", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+```
+
+### STL
+
+### ATL discont
+#### # arrivals on-time
+```{r fig.height=4.5, fig.width=6}
+
+standard_air <- standard %>%
+  filter(Facility == 'STL') %>%
+  filter(Date >= "2003-11-01")
+
+before_date <- "2006-05-01"
+after_date <- "2007-05-01"
+
+ggplot(standard_air,aes(x=Date,y=On_Time_Arrivals))+
+    geom_point() +
+  scale_y_continuous(labels = scales::comma_format(scale = .001, suffix = "k") ) +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+  geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+  ggtitle(label = "") +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "On-Time Flight Arrivals", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
+```
+
+#### % arrivals on-time
+```{r fig.height=4.5, fig.width=6}
+standard_air <- standard %>%
+  filter(Facility == "STL")
+
+before_date <- "2006-04-01"
+after_date <- "2007-04-01"
+
+ggplot(standard_a, aes(x=Date,y=Perc_On_Time_Gate_Arrs))+
+  geom_point() +
+  geom_point(data=subset(standard_air, Date >= after_date)) +
+  geom_smooth(data=subset(standard_air, Date >= after_date), 
+              aes(color = "2"), method='lm',formula=y~x,se=F, color = my_colors("dis")[2], 
+              size = 2) +
+  geom_point(data=subset(standard_air, Date <= before_date)) +
+  geom_smooth(data=subset(standard_air, Date <= before_date), 
+              aes(color  = "0"), method='lm',formula=y~x,se=F, color = my_colors("dis")[1], 
+              size = 2) +
+geom_vline(xintercept = as.numeric(as.Date(after_date)), linetype='dashed') +
+  geom_vline(xintercept = as.numeric(as.Date(before_date)), linetype='dashed') +
+    ggtitle(label = "") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual(values = c("0" = my_colors("dis")[2], "1" = "black", 
+                                "2" = my_colors("dis")[1]),
+                     labels = c("Before","After")) +
+  labs(y = "Percent On-Time", color = "Expansion Period", x = "") +
+
+  theme(axis.text.x = element_text(size = 18), 
+        axis.text.y = element_text(size=18)) 
 ```
